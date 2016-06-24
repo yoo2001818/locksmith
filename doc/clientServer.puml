@@ -1,0 +1,49 @@
+@startuml
+  ==Initialization==
+  Client -> Server: Connect
+  Server -> Server: Serialize state
+  Server -> Client: Send state
+  Client -> Client: Unpack state
+  Client -> Server: Acknowledge
+  Server -> Server: Check trip time
+  ==User Event==
+  Client -> Client: Enqueue event to output
+  alt Dynamic mode
+    Client -> Client: Create timer
+    ... Wait for threshold ...
+    Client -> Server: Push events
+    Server -> Server: Enqueue
+    Server -> Server: Create timer
+    ... Wait for threshold ...
+    Server -> Server: Issue new tick
+  end alt
+  ==Tick==
+  Server -> Server: Check clients state
+  alt Client ack not received
+    ... Hang ...
+    Server -> Server: Disconnect node
+    Server -> Server: Enqueue disconnect event
+  end alt
+  Server -> Server: Increment tick ID
+  Server -> Client: Send tick data
+  Server -> Server: Run machine with input
+  Server -> Server: Enqueue output
+  Client -> Client: Enqueue tick to input
+  alt Dynamic mode
+    Client -> Client: Handle tick immedately
+  else Static mode
+    Client -> Server: Ack tick with output
+  end alt
+  ==ClientTick==
+  alt Static mode
+    Client -> Client: Check input buffer
+    ... Hang ...
+  end alt
+  Client -> Client: Run machine with input
+  alt Dynamic mode
+    Client -> Server: Ack tick with output
+  else Static mode
+    Client -> Client: Enqueue output
+  end alt
+
+@enduml
