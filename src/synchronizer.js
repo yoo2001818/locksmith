@@ -97,7 +97,8 @@ export default class Synchronizer {
         id: this.connector.getClientId(),
         rtt: 0,
         ackId: 0,
-        lastTime: Date.now()
+        lastTime: Date.now(),
+        connected: true
       });
     }
     if (this.config.dynamic) {
@@ -271,13 +272,17 @@ export default class Synchronizer {
     }
   }
   doFreeze(client) {
-    if (!client.frozen) {
+    if (!this.host) {
+      this.frozen = true;
+    } else if (!client.frozen) {
       client.frozen = true;
       this.frozen += 1;
     }
   }
   doUnfreeze(client) {
-    if (client.frozen) {
+    if (!this.host) {
+      this.frozen = false;
+    } else if (client.frozen) {
       client.frozen = false;
       this.frozen -= 1;
       if (this.frozen < 0) {
@@ -286,10 +291,46 @@ export default class Synchronizer {
     }
   }
   // Handle connection - add client, freeze, etc...
-  handleConnect(state, clientId) {
-  }
-  // Handle connection ack - calculate RTT, trigger action, etc...
-  handleConnectAck(clientId) {
+  handleConnect(data, clientId) {
+    if (this.host) {
+      if (this.clients[clientId] != null) {
+        throw new Error('Client already joined');
+      }
+      // Create client information
+      let client = {
+        id: clientId,
+        rtt: 0,
+        ackId: this.tickId,
+        lastTime: Date.now(),
+        connected: false
+      };
+      this.addClient(client);
+      // Freeze until client sends ACK.
+      this.doFreeze(client);
+      // Send client the state information.
+      this.connector.sendConnect({
+        state: this.machine.getState(),
+        tickId: this.tickId,
+        config: this.config
+        // Nothing else is required for now
+      }, clientId);
+    } else {
+      // Server has sent the startup state information.
+      if (this.started) {
+        throw new Error('Client startup already done; but server sent' +
+          'connection info');
+      }
+      this.tickId = data.tickId;
+      this.config = data.config;
+      this.machine.loadState(data.state);
+      this.start();
+      // Send ACK right away
+      this.connector.ack({
+        id: this.tickId,
+        actions: this.outputQueue
+      }, this.connector.getHostId());
+      this.outputQueue = [];
+    }
   }
   // Handle disconnect - remove client, trigger action, etc...
   handleDisconnect(clientId) {
@@ -310,17 +351,27 @@ export default class Synchronizer {
     if (actions == null || actions.id !== client.ackId + 1) {
       throw new Error('Wrong tick data received; order matching failed');
     }
+    if (actions.id > this.tickId) {
+      // Well, literally.
+      throw new Error('Client is from the future');
+    }
     client.ackId = actions.id;
     // Copy the contents to input queue. concat is pretty slow.
     for (let i = 0; i < actions.actions.length; ++i) {
       this.inputQueue.push(actions.actions[i]);
     }
-    // Update last time .
-    client.lastTime = Date.now();
     // Update RTT...
-    client.rtt = client.lastTime - this.tickTime[
-      Math.max(0, this.tickTime.length - (this.tickId - actions.id))
-    ];
+    if (client.connected) {
+      client.rtt = Date.now() - this.tickTime[
+        Math.max(0, this.tickTime.length - (this.tickId - actions.id))
+      ];
+    } else {
+      client.rtt = Date.now() - client.lastTime;
+      client.connected = true;
+    }
+    // Update last time.
+    client.lastTime = Date.now();
+    this.doUnfreeze(client);
     if (actions.actions.length !== 0 && this.config.dynamic) {
       // Start the dynamic tick timer,
       if (this.dynamicTickTimer === null && this.started) {
