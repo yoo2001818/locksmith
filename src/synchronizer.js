@@ -67,8 +67,8 @@ export default class Synchronizer {
     // The client list. Used by the host.
     this.clients = {};
     this.clientList = [];
-    // Is the system frozen?
-    this.frozen = true;
+    // Is the system frozen? How many clients are affecting the status?
+    this.frozen = 0;
     // Is the system started?
     this.started = false;
     // Is this a host?
@@ -206,13 +206,13 @@ export default class Synchronizer {
           // TODO
         }
         if (client.lastTime + this.config.freezeWait < currentTime) {
-          // Freeze...
-          this.doFreeze();
-          return;
+          // Freeze... In dynamic mode, we should start a tick timer to count
+          // down to the disconnection.
+          this.doFreeze(client);
         }
       }
-      // If it was frozen, unfreeze it now
-      if (this.frozen) this.doUnfreeze();
+      // If it's frozen, don't process it
+      if (this.frozen) return;
       // Increment the tick ID
       this.tickId ++;
       this.tickTime.push(currentTime);
@@ -228,6 +228,7 @@ export default class Synchronizer {
         actions: this.inputQueue
       };
       for (let i = 0; i < this.clientList.length; ++i) {
+        if (this.clientList[i].id === this.connector.getHostId()) continue;
         this.connector.push(sendData, this.clientList[i].id);
       }
       // Done! process the data, and empty the input queue.
@@ -237,6 +238,13 @@ export default class Synchronizer {
       }
       this.inputQueue = [];
       // We're all done!
+      // Send previous ACK right after handling the tick.
+      // This will probably trigger 1-tick delay...
+      this.handleAck({
+        id: this.tickId,
+        actions: this.outputQueue
+      }, this.connector.getHostId());
+      this.outputQueue = [];
     } else {
       // Do we have sufficient tick data? If not, freeze!
       if ((!this.config.dynamic &&
@@ -262,11 +270,20 @@ export default class Synchronizer {
       // handle it.
     }
   }
-  doFreeze() {
-    this.frozen = true;
+  doFreeze(client) {
+    if (!client.frozen) {
+      client.frozen = true;
+      this.frozen += 1;
+    }
   }
-  doUnfreeze() {
-    this.frozen = false;
+  doUnfreeze(client) {
+    if (client.frozen) {
+      client.frozen = false;
+      this.frozen -= 1;
+      if (this.frozen < 0) {
+        throw new Error('Frozen is less than 0 - something went wrong!');
+      }
+    }
   }
   // Handle connection - add client, freeze, etc...
   handleConnect(state, clientId) {
@@ -279,5 +296,39 @@ export default class Synchronizer {
   }
   // Handle acknowledge - calculate RTT, add action, trigger tick, etc...
   handleAck(actions, clientId) {
+    // Handle ACK; Only host will process it.
+    if (!this.host) return;
+    // ACK data has id and actions...
+    let client = this.clients[clientId];
+    if (client == null) {
+      // Client doesn't exist. But where do we need to send the error?
+      // TODO Add error processing mechanism
+      throw new Error('Client ID ' + clientId + ' does not exist');
+    }
+    // Is this really necessary?
+    // TCP will handle order issue, so we don't have to care about it
+    if (actions == null || actions.id !== client.ackId + 1) {
+      throw new Error('Wrong tick data received; order matching failed');
+    }
+    client.ackId = actions.id;
+    // Copy the contents to input queue. concat is pretty slow.
+    for (let i = 0; i < actions.actions.length; ++i) {
+      this.inputQueue.push(actions.actions[i]);
+    }
+    // Update last time .
+    client.lastTime = Date.now();
+    // Update RTT...
+    client.rtt = client.lastTime - this.tickTime[
+      Math.max(0, this.tickTime.length - (this.tickId - actions.id))
+    ];
+    if (actions.actions.length !== 0 && this.config.dynamic) {
+      // Start the dynamic tick timer,
+      if (this.dynamicTickTimer === null && this.started) {
+        this.dynamicTickTimer = setTimeout(() => {
+          this.dynamicTickTimer = null;
+          this.handleTick();
+        }, this.config.dynamicTickWait);
+      }
+    }
   }
 }
