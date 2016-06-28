@@ -247,6 +247,13 @@ export default class Synchronizer {
         this.tickTime.shift();
       }
       debug('Removing tickTime entry: %d left', this.tickTime.length);
+      // Send previous ACK right after handling the tick.
+      debug('Sending ACK to server itself');
+      this.handleAck({
+        id: this.tickId,
+        actions: this.outputQueue
+      }, this.connector.getHostId());
+      this.outputQueue = [];
       // Now, push the input buffer to the clients.
       let sendData = {
         id: this.tickId,
@@ -264,14 +271,6 @@ export default class Synchronizer {
       }
       this.inputQueue = [];
       // We're all done!
-      // Send previous ACK right after handling the tick.
-      // This will probably trigger 1-tick delay...
-      debug('Sending ACK to server itself');
-      this.handleAck({
-        id: this.tickId,
-        actions: this.outputQueue
-      }, this.connector.getHostId());
-      this.outputQueue = [];
     } else {
       // Do we have sufficient tick data? If not, freeze!
       if ((!this.config.dynamic &&
@@ -292,7 +291,7 @@ export default class Synchronizer {
         let frame = this.inputQueue.shift();
         this.tickId = frame.id;
         debug('Processing tick', frame.id, frame.actions);
-        for (let i = 0; i < frame.length; ++i) {
+        for (let i = 0; i < frame.actions.length; ++i) {
           this.machine.run(frame.actions[i]);
         }
       }
@@ -342,7 +341,7 @@ export default class Synchronizer {
       this.doFreeze(client);
       // Send client the state information.
       debug('Sending current information');
-      this.connector.sendConnect({
+      this.connector.connect({
         state: this.machine.getState(),
         tickId: this.tickId,
         config: this.config
@@ -403,14 +402,15 @@ export default class Synchronizer {
     debug('Handling ACK %d from client %d', actions.id, clientId);
     // Is this really necessary?
     // TCP will handle order issue, so we don't have to care about it
-    if (actions == null || actions.id !== client.ackId + 1) {
+    if (actions == null ||
+      (client.connected && actions.id !== client.ackId + 1)) {
       throw new Error('Wrong tick data received; order matching failed');
     }
     if (actions.id > this.tickId) {
       // Well, literally.
       throw new Error('Client is from the future');
     }
-    client.ackId = actions.id;
+    if (client.connected) client.ackId = actions.id;
     debug('Client input queue:', actions.actions);
     // Copy the contents to input queue. concat is pretty slow.
     for (let i = 0; i < actions.actions.length; ++i) {

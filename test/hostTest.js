@@ -9,7 +9,7 @@ let machine = new ReducerMachine(calculatorReducer);
 let connector = new LocalConnectorServer();
 
 let synchronizer = new Synchronizer(machine, connector, {
-  dynamic: false,
+  dynamic: true,
   dynamicPushWait: 100,
   dynamicTickWait: 100,
   fixedTick: 1000,

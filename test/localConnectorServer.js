@@ -3,9 +3,10 @@ import { EventEmitter } from 'events';
 export default class LocalConnectorServer extends EventEmitter {
   constructor() {
     super();
+    this.clients = 1;
   }
   setSynchronizer(synchronizer) {
-    this.synchornizer = synchronizer;
+    this.synchronizer = synchronizer;
   }
   getHostId() {
     return 0;
@@ -19,7 +20,19 @@ export default class LocalConnectorServer extends EventEmitter {
   ack(data, target) {
     this.emit('ack', data, target);
   }
-  sendConnect(data, target) {
+  connect(data, target) {
     this.emit('connect', data, target);
+  }
+  handlePush(data, target) {
+    this.synchronizer.handlePush(data, target);
+  }
+  handleConnect(data, target) {
+    this.synchronizer.handleConnect(data, target);
+  }
+  handleDisconnect(target) {
+    this.synchronizer.handleDisconnect(target);
+  }
+  handleAck(data, target) {
+    this.synchronizer.handleAck(data, target);
   }
 }

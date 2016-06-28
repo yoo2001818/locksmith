@@ -11,7 +11,7 @@ export default class Connector {
   ack(data, target) {
 
   }
-  sendConnect(data, target) {
+  connect(data, target) {
 
   }
 }
