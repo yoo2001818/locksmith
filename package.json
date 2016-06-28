@@ -1,8 +1,8 @@
 {
   "name": "locksmith",
   "version": "0.1.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Lockstep deterministic state machine synchronization library",
+  "main": "lib/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -1,3 +1,5 @@
+// This is just a dummy class marking the methods required by synchronizer.
+
 export default class Connector {
   getHostId() {
 
@@ -15,6 +17,6 @@ export default class Connector {
 
   }
   disconnect(target) {
-    
+
   }
 }
