@@ -1,11 +1,17 @@
 export default class Connector {
   getHostId() {
-    
+
   }
   getClientId() {
 
   }
-  push(queue, target) {
+  push(data, target) {
+
+  }
+  ack(data, target) {
+
+  }
+  sendConnect(data, target) {
 
   }
 }

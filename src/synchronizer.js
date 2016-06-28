@@ -1,3 +1,5 @@
+const debug = require('debug')('locksmith:synchronizer');
+
 export default class Synchronizer {
   constructor(machine, connector) {
     /**
@@ -79,10 +81,12 @@ export default class Synchronizer {
     this.fixedTickTimer = null;
   }
   addClient(client) {
+    debug('Client added: ', client.id);
     this.clients[client.id] = client;
     this.clientList.push(client);
   }
   removeClient(clientId) {
+    debug('Client removed', clientId);
     let client = this.clients[clientId];
     this.clientList.splice(this.clientList.indexOf(client), 1);
     // Or we can call remove
@@ -91,8 +95,10 @@ export default class Synchronizer {
   // Only server should call this; clients will automatically call this
   // when connected.
   start() {
+    debug('Synchronizer starting');
     this.started = true;
     if (this.host) {
+      debug('Host: adding itself into the clients list');
       this.addClient({
         id: this.connector.getClientId(),
         rtt: 0,
@@ -102,6 +108,7 @@ export default class Synchronizer {
       });
     }
     if (this.config.dynamic) {
+      debug('Dynamic mode: processing backlogs');
       // If there are any backlogs in output buffer, process them now
       this.doPush();
       // If there are any backlogs in input buffer, process them too
@@ -111,6 +118,7 @@ export default class Synchronizer {
     } else {
       // Start the tick timer..
       if (this.fixedTickTimer === null) {
+        debug('Fixed mode: starting tick timer');
         this.fixedTickTimer = setInterval(() => this.handleTick(),
           this.config.fixedTick);
       }
@@ -119,6 +127,7 @@ export default class Synchronizer {
   // Stop the synchronizer. This will freeze all connected nodes.
   stop() {
     this.started = false;
+    debug('Stopping synchronizer');
     if (!this.config.dynamic && this.fixedTickTimer !== null) {
       // Clear the tick timer.
       clearInterval(this.fixedTickTimer);
@@ -127,9 +136,12 @@ export default class Synchronizer {
   }
   // Queues and triggers the action created from UI / etc, ...
   push(action) {
+    debug('Push:', action);
     this.outputQueue.push(action);
     if (this.config.dynamic && this.dynamicPushTimer === null && this.started) {
+      debug('Dynamic mode: starting push timer');
       this.dynamicPushTimer = setTimeout(() => {
+        debug('Push timer completed');
         this.dynamicPushTimer = null;
         this.doPush();
       }, this.config.dynamicPushWait);
@@ -140,6 +152,7 @@ export default class Synchronizer {
   doPush() {
     if (!this.started || !this.config.dynamic) return;
     if (this.outputQueue.length === 0) return;
+    debug('Dynamic mode: pushing actions to host');
     if (this.host) {
       this.handlePush(this.outputQueue, this.connector.getClientId());
       this.outputQueue = [];
@@ -160,13 +173,16 @@ export default class Synchronizer {
         // TODO Add error processing mechanism
         throw new Error('Client ID ' + clientId + ' does not exist');
       }
+      debug('Received push from ', clientId);
       // Copy the contents to input queue. concat is pretty slow.
       for (let i = 0; i < actions.length; ++i) {
         this.inputQueue.push(actions[i]);
       }
       // Start the dynamic tick timer,
-      if (this.dynamicTickTimer === null && this.started) {
+      if (!this.frozen && this.dynamicTickTimer === null && this.started) {
+        debug('Starting tick timer');
         this.dynamicTickTimer = setTimeout(() => {
+          debug('Tick timer completed');
           this.dynamicTickTimer = null;
           this.handleTick();
         }, this.config.dynamicTickWait);
@@ -179,6 +195,7 @@ export default class Synchronizer {
       ) {
         throw new Error('Wrong tick data received; desync occurred?');
       }
+      debug('Received push from the server');
       this.inputQueue.push(actions);
       this.connector.ack({
         id: actions.id,
@@ -187,6 +204,7 @@ export default class Synchronizer {
       this.outputQueue = [];
       // Cancel push timer if exists.
       if (this.config.dynamic && this.dynamicPushTimer != null) {
+        debug('Cancelling push timer');
         clearTimeout(this.dynamicPushTimer);
         this.dynamicPushTimer = null;
       }
@@ -203,10 +221,14 @@ export default class Synchronizer {
       for (let i = 0; i < this.clientList.length; ++i) {
         let client = this.clientList[i];
         if (client.lastTime + this.config.disconnectWait < currentTime) {
+          debug('Client %d over disconnect threshold, disconnecting',
+            client.id);
           // Forcefully disconnect the client
           // TODO
         }
         if (client.lastTime + this.config.freezeWait < currentTime) {
+          debug('Client %d over freeze threshold, freezing',
+            client.id);
           // Freeze... In dynamic mode, we should start a tick timer to count
           // down to the disconnection.
           this.doFreeze(client);
@@ -217,17 +239,20 @@ export default class Synchronizer {
       // Increment the tick ID
       this.tickId ++;
       this.tickTime.push(currentTime);
+      debug('System not frozen; processing tick', this.tickId);
       // Remove tickTime entry until specified length is reached
       while (this.tickTime.length >
         this.config.freezeWait / this.config.fixedTick
       ) {
         this.tickTime.shift();
       }
+      debug('Removing tickTime entry: %d left', this.tickTime.length);
       // Now, push the input buffer to the clients.
       let sendData = {
         id: this.tickId,
         actions: this.inputQueue
       };
+      debug('Pushing input queue', this.inputQueue);
       for (let i = 0; i < this.clientList.length; ++i) {
         if (this.clientList[i].id === this.connector.getHostId()) continue;
         this.connector.push(sendData, this.clientList[i].id);
@@ -241,6 +266,7 @@ export default class Synchronizer {
       // We're all done!
       // Send previous ACK right after handling the tick.
       // This will probably trigger 1-tick delay...
+      debug('Sending ACK to server itself');
       this.handleAck({
         id: this.tickId,
         actions: this.outputQueue
@@ -253,16 +279,19 @@ export default class Synchronizer {
         this.inputQueue.length === 0
       ) {
         // Insufficient data, freeze.
+        debug('Insufficient data in buffer; freezing.');
         this.doFreeze();
         return;
       }
       if (this.frozen) {
+        debug('Data received; unfreezing.');
         this.doUnfreeze();
       }
       // Process input queue until we have no data remaining.
       while (this.inputQueue.length > this.config.fixedBuffer) {
         let frame = this.inputQueue.shift();
         this.tickId = frame.id;
+        debug('Processing tick', frame.id, frame.actions);
         for (let i = 0; i < frame.length; ++i) {
           this.machine.run(frame.actions[i]);
         }
@@ -275,6 +304,7 @@ export default class Synchronizer {
     if (!this.host) {
       this.frozen = true;
     } else if (!client.frozen) {
+      debug('Freezing due to client %d, counter %d', client.id, this.frozen);
       client.frozen = true;
       this.frozen += 1;
     }
@@ -285,6 +315,7 @@ export default class Synchronizer {
     } else if (client.frozen) {
       client.frozen = false;
       this.frozen -= 1;
+      debug('Unfreezing client %d, counter %d', client.id, this.frozen);
       if (this.frozen < 0) {
         throw new Error('Frozen is less than 0 - something went wrong!');
       }
@@ -296,6 +327,7 @@ export default class Synchronizer {
       if (this.clients[clientId] != null) {
         throw new Error('Client already joined');
       }
+      debug('Client %d has joined', clientId);
       // Create client information
       let client = {
         id: clientId,
@@ -306,8 +338,10 @@ export default class Synchronizer {
       };
       this.addClient(client);
       // Freeze until client sends ACK.
+      debug('Freezing until ACK received');
       this.doFreeze(client);
       // Send client the state information.
+      debug('Sending current information');
       this.connector.sendConnect({
         state: this.machine.getState(),
         tickId: this.tickId,
@@ -320,10 +354,13 @@ export default class Synchronizer {
         throw new Error('Client startup already done; but server sent' +
           'connection info');
       }
+      debug('Connect event received', data.tickId);
+      debug(data.config);
       this.tickId = data.tickId;
       this.config = data.config;
       this.machine.loadState(data.state);
       this.start();
+      debug('Sending connect ACK');
       // Send ACK right away
       this.connector.ack({
         id: this.tickId,
@@ -334,6 +371,23 @@ export default class Synchronizer {
   }
   // Handle disconnect - remove client, trigger action, etc...
   handleDisconnect(clientId) {
+    if (this.host) {
+      let client = this.clients[clientId];
+      if (client == null) {
+        // Client doesn't exist. But where do we need to send the error?
+        // TODO Add error processing mechanism
+        throw new Error('Client ID ' + clientId + ' does not exist');
+      }
+      debug('Client %d has disconnected', clientId);
+      // Remove the client, that's all.
+      this.removeClient(clientId);
+      this.doUnfreeze(client);
+      // Prehaps we should send disconnect event to other servers.
+    } else {
+      // Disconnected...
+      debug('Disconnected from the server, stopping');
+      this.stop();
+    }
   }
   // Handle acknowledge - calculate RTT, add action, trigger tick, etc...
   handleAck(actions, clientId) {
@@ -346,6 +400,7 @@ export default class Synchronizer {
       // TODO Add error processing mechanism
       throw new Error('Client ID ' + clientId + ' does not exist');
     }
+    debug('Handling ACK %d from client %d', actions.id, clientId);
     // Is this really necessary?
     // TCP will handle order issue, so we don't have to care about it
     if (actions == null || actions.id !== client.ackId + 1) {
@@ -356,6 +411,7 @@ export default class Synchronizer {
       throw new Error('Client is from the future');
     }
     client.ackId = actions.id;
+    debug('Client input queue:', actions.actions);
     // Copy the contents to input queue. concat is pretty slow.
     for (let i = 0; i < actions.actions.length; ++i) {
       this.inputQueue.push(actions.actions[i]);
@@ -365,17 +421,21 @@ export default class Synchronizer {
       client.rtt = Date.now() - this.tickTime[
         Math.max(0, this.tickTime.length - (this.tickId - actions.id))
       ];
+      debug('Update RTT:', client.rtt);
     } else {
       client.rtt = Date.now() - client.lastTime;
       client.connected = true;
+      debug('Initial ack, update RTT:', client.rtt);
     }
     // Update last time.
     client.lastTime = Date.now();
     this.doUnfreeze(client);
-    if (actions.actions.length !== 0 && this.config.dynamic) {
+    if (this.inputQueue.length !== 0 && this.config.dynamic) {
       // Start the dynamic tick timer,
       if (this.dynamicTickTimer === null && this.started) {
+        debug('Starting tick timer');
         this.dynamicTickTimer = setTimeout(() => {
+          debug('Tick timer completed');
           this.dynamicTickTimer = null;
           this.handleTick();
         }, this.config.dynamicTickWait);
