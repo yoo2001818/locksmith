@@ -169,9 +169,9 @@ export default class Synchronizer {
       if (!this.config.dynamic) return;
       let client = this.clients[clientId];
       if (client == null) {
-        // Client doesn't exist. But where do we need to send the error?
-        // TODO Add error processing mechanism
-        throw new Error('Client ID ' + clientId + ' does not exist');
+        this.connector.error('Client ID ' + clientId + ' does not exist',
+          clientId);
+        return;
       }
       debug('Received push from ', clientId);
       // Copy the contents to input queue. concat is pretty slow.
@@ -193,7 +193,9 @@ export default class Synchronizer {
         (this.tickId + 1 !== actions.id) :
         (this.inputQueue[this.inputQueue.length - 1].id + 1 !== actions.id)
       ) {
-        throw new Error('Wrong tick data received; desync occurred?');
+        this.connector.error('Wrong tick data received; desync occurred?',
+          this.connector.getHostId());
+        return;
       }
       debug('Received push from the server');
       this.inputQueue.push(actions);
@@ -318,7 +320,8 @@ export default class Synchronizer {
       this.frozen -= 1;
       debug('Unfreezing client %d, counter %d', client.id, this.frozen);
       if (this.frozen < 0) {
-        throw new Error('Frozen is less than 0 - something went wrong!');
+        // This isn't client's fault - thus we throw an error.
+        throw new Error('Frozen lower than 0 - something went wrong.');
       }
     }
   }
@@ -326,7 +329,8 @@ export default class Synchronizer {
   handleConnect(data, clientId) {
     if (this.host) {
       if (this.clients[clientId] != null) {
-        throw new Error('Client already joined');
+        this.connector.error('Client already joined', clientId);
+        return;
       }
       debug('Client %d has joined', clientId);
       // Create client information
@@ -352,8 +356,9 @@ export default class Synchronizer {
     } else {
       // Server has sent the startup state information.
       if (this.started) {
-        throw new Error('Client startup already done; but server sent' +
-          'connection info');
+        this.connector.error('Client startup already done; but server sent' +
+          'connection info', this.connector.getHostId());
+        return;
       }
       debug('Connect event received', data.tickId);
       debug(data.config);
@@ -375,9 +380,8 @@ export default class Synchronizer {
     if (this.host) {
       let client = this.clients[clientId];
       if (client == null) {
-        // Client doesn't exist. But where do we need to send the error?
-        // TODO Add error processing mechanism
-        throw new Error('Client ID ' + clientId + ' does not exist');
+        this.connector.error('Client ID ' + clientId + ' does not exist',
+          clientId);
       }
       debug('Client %d has disconnected', clientId);
       // Remove the client, that's all.
@@ -397,20 +401,24 @@ export default class Synchronizer {
     // ACK data has id and actions...
     let client = this.clients[clientId];
     if (client == null) {
-      // Client doesn't exist. But where do we need to send the error?
-      // TODO Add error processing mechanism
-      throw new Error('Client ID ' + clientId + ' does not exist');
+      this.connector.error('Client ID ' + clientId + ' does not exist',
+        clientId);
+      return;
     }
     debug('Handling ACK %d from client %d', actions.id, clientId);
     // Is this really necessary?
     // TCP will handle order issue, so we don't have to care about it
     if (actions == null ||
       (client.connected && actions.id !== client.ackId + 1)) {
-      throw new Error('Wrong tick data received; order matching failed');
+      this.connector.error('Wrong tick data received; order matching failed',
+        clientId);
+      return;
     }
     if (actions.id > this.tickId) {
       // Well, literally.
-      throw new Error('Client is from the future');
+      this.connector.error('Wrong tick data received; client is from future',
+        clientId);
+      return;
     }
     if (client.connected) client.ackId = actions.id;
     debug('Client input queue:', actions.actions);

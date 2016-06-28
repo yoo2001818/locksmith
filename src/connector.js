@@ -19,4 +19,7 @@ export default class Connector {
   disconnect(target) {
 
   }
+  error(data, target) {
+    
+  }
 }

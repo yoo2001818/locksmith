@@ -43,6 +43,9 @@ export default class LocalConnectorClient {
     setTimeout(() => this.server.handleConnect(data, this.clientId),
       this.delay);
   }
+  error(data) {
+    console.log('Client Error: ' + data);
+  }
   disconnect() {
     setTimeout(() => this.server.handleDisconnect(this.clientId), this.delay);
   }

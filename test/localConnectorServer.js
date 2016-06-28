@@ -26,6 +26,9 @@ export default class LocalConnectorServer extends EventEmitter {
   disconnect(target) {
     this.emit('disconnect', target);
   }
+  error(data, target) {
+    console.log('Error to ' + target + ': ' + data);
+  }
   handlePush(data, target) {
     this.synchronizer.handlePush(data, target);
   }

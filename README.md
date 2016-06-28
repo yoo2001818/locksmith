@@ -29,6 +29,8 @@ The connector should implement following functions:
   hasn't made, it should connect to the target.
 - disconnect(targetId) - Executes `synchronizer.handleDisconnect(senderId)`
   on target. The connection should be closed, of course.
+- error(data, targetId) - Handles the error. It may send the error to target,
+  or just print it on the console.
 
 ## Machine
 Then, you need to create a machine object to process the action and the state.
@@ -41,6 +43,12 @@ The machine should implement following functions:
 
 The state and action should be serializable objects - JSON is preferred,
 however, anything can be used as long as the connector can process it.
+
+### Action
+Actions are processed with FIFO order (First-come-first-served), however,
+still action order conflicts can occur. Machine should be able to process
+the action normally even if action conflict occurs. Synchronizer should
+provide a way to sort the actions, but it's work in progress.
 
 ## Combining
 Lastly, combine everything together to create a synchronizer.
