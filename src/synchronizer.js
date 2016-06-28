@@ -1,7 +1,10 @@
+import { EventEmitter } from 'events';
+
 const debug = require('debug')('locksmith:synchronizer');
 
-export default class Synchronizer {
+export default class Synchronizer extends EventEmitter {
   constructor(machine, connector, config) {
+    super();
     /**
      * The deterministic state machine to use. Note that it MUST be
      * deterministic, or the synchronization won't work at all! It shouldn't
@@ -97,6 +100,7 @@ export default class Synchronizer {
   start() {
     debug('Synchronizer starting');
     this.started = true;
+    this.emit('start');
     if (this.host) {
       debug('Host: adding itself into the clients list');
       this.addClient({
@@ -128,6 +132,7 @@ export default class Synchronizer {
   stop() {
     this.started = false;
     debug('Stopping synchronizer');
+    this.emit('stop');
     if (!this.config.dynamic && this.fixedTickTimer !== null) {
       // Clear the tick timer.
       clearInterval(this.fixedTickTimer);
@@ -275,6 +280,7 @@ export default class Synchronizer {
       }
       this.inputQueue = [];
       // We're all done!
+      this.emit('tick', this.tickId);
     } else {
       // Do we have sufficient tick data? If not, freeze!
       if ((!this.config.dynamic &&
@@ -298,6 +304,7 @@ export default class Synchronizer {
         for (let i = 0; i < frame.actions.length; ++i) {
           this.machine.run(frame.actions[i]);
         }
+        this.emit('tick', this.tickId);
       }
       // Since machine will call push function by itself, we don't need to
       // handle it.
@@ -305,20 +312,25 @@ export default class Synchronizer {
   }
   doFreeze(client) {
     if (!this.host) {
+      if (!this.frozen) return;
       this.frozen = true;
+      this.emit('freeze');
     } else if (!client.frozen) {
       client.frozen = true;
       this.frozen += 1;
       debug('Freezing due to client %d, counter %d', client.id, this.frozen);
+      if (this.frozen === 1) this.emit('freeze', client.id);
     }
   }
   doUnfreeze(client) {
     if (!this.host) {
       this.frozen = false;
+      this.emit('unfreeze');
     } else if (client.frozen) {
       client.frozen = false;
       this.frozen -= 1;
       debug('Unfreezing client %d, counter %d', client.id, this.frozen);
+      if (this.frozen === 0) this.emit('unfreeze', client.id);
       if (this.frozen < 0) {
         // This isn't client's fault - thus we throw an error.
         throw new Error('Frozen lower than 0 - something went wrong.');
@@ -353,6 +365,7 @@ export default class Synchronizer {
         config: this.config
         // Nothing else is required for now
       }, clientId);
+      this.emit('connect', clientId);
     } else {
       // Server has sent the startup state information.
       if (this.started) {
@@ -373,6 +386,7 @@ export default class Synchronizer {
         actions: this.outputQueue
       }, this.connector.getHostId());
       this.outputQueue = [];
+      this.emit('connect');
     }
   }
   // Handle disconnect - remove client, trigger action, etc...
@@ -388,10 +402,12 @@ export default class Synchronizer {
       this.removeClient(clientId);
       this.doUnfreeze(client);
       // Prehaps we should send disconnect event to other servers.
+      this.emit('disconnect', clientId);
     } else {
       // Disconnected...
       debug('Disconnected from the server, stopping');
       this.stop();
+      this.emit('disconnect');
     }
   }
   // Handle acknowledge - calculate RTT, add action, trigger tick, etc...

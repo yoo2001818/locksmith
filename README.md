@@ -91,6 +91,38 @@ connector.synchronizer = synchronizer;
 connector.connect();
 ```
 
+### Pushing actions
+```js
+let action = {}; // It can be anything
+synchronizer.push(action);
+```
+
+### Sending connect action
+Host (Server) can register a event listener to spawn a connect event.
+```js
+synchronizer.on('connect', clientId => {
+  synchronizer.push({
+    type: 'connect',
+    id: clientId
+    // etc...
+  });
+});
+```
+
+Same for disconnect, etc.
+
+# Events
+- start() - Synchronizer has started.
+- stop() - Synchronizer has stopped.
+- tick(tickId) - Tick has occurred.
+- freeze(clientId) - Synchronizer freezed. `clientId` is only available on host.
+- unfreeze(clientId) - Synchronizer unfreezed. `clientId` is only available on
+  host.
+- connect(clientId) - A client has connected. `clientId` is only available on
+  host.
+- disconnect(clientId) - A client has disconnected. `clientId` is only available
+  on host.
+
 # Configuration
 Synchronizer has number of options that changes the behavior of synchronization.
 
