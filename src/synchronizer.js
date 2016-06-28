@@ -1,7 +1,7 @@
 const debug = require('debug')('locksmith:synchronizer');
 
 export default class Synchronizer {
-  constructor(machine, connector) {
+  constructor(machine, connector, config) {
     /**
      * The deterministic state machine to use. Note that it MUST be
      * deterministic, or the synchronization won't work at all! It shouldn't
@@ -27,7 +27,7 @@ export default class Synchronizer {
     // connection time if the protocol supports it.
     // The configuration object is pure JSON object, so it can be easily
     // serialized.
-    this.config = {
+    this.config = config || {
       // If true, the tick only triggers when there is an action. This is useful
       // if tick shouldn't happen often.
       dynamic: true,
@@ -419,7 +419,7 @@ export default class Synchronizer {
     // Update RTT...
     if (client.connected) {
       client.rtt = Date.now() - this.tickTime[
-        Math.max(0, this.tickTime.length - (this.tickId - actions.id))
+        Math.max(0, this.tickTime.length - (this.tickId - actions.id) - 1)
       ];
       debug('Update RTT:', client.rtt);
     } else {
