@@ -14,4 +14,7 @@ export default class Connector {
   connect(data, target) {
 
   }
+  disconnect(target) {
+    
+  }
 }

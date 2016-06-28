@@ -1,22 +1,27 @@
 export default class LocalConnectorClient {
-  constructor(server) {
+  constructor(server, delay) {
     this.server = server;
+    this.delay = delay;
     this.clientId = server.clients ++;
     server.on('push', (data, target) => {
       if (this.clientId !== target) return;
-      this.synchronizer.handlePush(data, target);
+      setTimeout(() => this.synchronizer.handlePush(data, target),
+        this.delay);
     });
     server.on('ack', (data, target) => {
       if (this.clientId !== target) return;
-      this.synchronizer.handleAck(data, target);
+      setTimeout(() => this.synchronizer.handleAck(data, target),
+        this.delay);
     });
     server.on('connect', (data, target) => {
       if (this.clientId !== target) return;
-      this.synchronizer.handleConnect(data, target);
+      setTimeout(() => this.synchronizer.handleConnect(data, target),
+        this.delay);
     });
     server.on('disconnect', (target) => {
       if (this.clientId !== target) return;
-      this.synchronizer.handleDisconnect(target);
+      setTimeout(() => this.synchronizer.handleDisconnect(target),
+        this.delay);
     });
   }
   setSynchronizer(synchronizer) {
@@ -29,15 +34,16 @@ export default class LocalConnectorClient {
     return this.clientId;
   }
   push(data) {
-    this.server.handlePush(data, this.clientId);
+    setTimeout(() => this.server.handlePush(data, this.clientId), this.delay);
   }
   ack(data) {
-    this.server.handleAck(data, this.clientId);
+    setTimeout(() => this.server.handleAck(data, this.clientId), this.delay);
   }
   connect(data) {
-    this.server.handleConnect(data, this.clientId);
+    setTimeout(() => this.server.handleConnect(data, this.clientId),
+      this.delay);
   }
   disconnect() {
-    this.server.handleDisconnect(this.clientId);
+    setTimeout(() => this.server.handleDisconnect(this.clientId), this.delay);
   }
 }

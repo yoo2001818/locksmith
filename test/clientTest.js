@@ -27,7 +27,7 @@ function createServer() {
 
 function createClient(server) {
   let machine = new ReducerMachine(calculatorReducer);
-  let connector = new LocalConnectorClient(server);
+  let connector = new LocalConnectorClient(server, 2000);
 
   let synchronizer = new Synchronizer(machine, connector);
   connector.synchronizer = synchronizer;
@@ -36,7 +36,7 @@ function createClient(server) {
 
 let server = createServer();
 let clients = [];
-for (let i = 0; i < 3; ++i) {
+for (let i = 0; i < 1; ++i) {
   let client = createClient(server.connector);
   clients.push(client);
   client.connector.connect();
@@ -47,7 +47,7 @@ server.push(3);
 server.push('*');
 
 let k = 0;
-for (let i = 2; i >= 0; --i) {
+for (let i = 0; i >= 0; --i) {
   clients[i].push(k++);
   clients[i].push(k++);
   clients[i].push('+');

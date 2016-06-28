@@ -220,13 +220,15 @@ export default class Synchronizer {
       // then process itself.
       for (let i = 0; i < this.clientList.length; ++i) {
         let client = this.clientList[i];
+        // Client is matched up with the server; continue anyway.
+        if (client.ackId === this.tickId) continue;
         if (client.lastTime + this.config.disconnectWait < currentTime) {
           debug('Client %d over disconnect threshold, disconnecting',
             client.id);
           // Forcefully disconnect the client
-          // TODO
-        }
-        if (client.lastTime + this.config.freezeWait < currentTime) {
+          this.connector.disconnect(client.id);
+          this.handleDisconnect(client.id);
+        } else if (client.lastTime + this.config.freezeWait < currentTime) {
           debug('Client %d over freeze threshold, freezing',
             client.id);
           // Freeze... In dynamic mode, we should start a tick timer to count
@@ -303,9 +305,9 @@ export default class Synchronizer {
     if (!this.host) {
       this.frozen = true;
     } else if (!client.frozen) {
-      debug('Freezing due to client %d, counter %d', client.id, this.frozen);
       client.frozen = true;
       this.frozen += 1;
+      debug('Freezing due to client %d, counter %d', client.id, this.frozen);
     }
   }
   doUnfreeze(client) {
