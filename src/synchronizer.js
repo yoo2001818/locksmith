@@ -178,6 +178,10 @@ export default class Synchronizer extends EventEmitter {
           clientId);
         return;
       }
+      if (!Array.isArray(actions)) {
+        this.connector.error('Actions value is not array', clientId);
+        return;
+      }
       debug('Received push from ', clientId);
       // Copy the contents to input queue. concat is pretty slow.
       for (let i = 0; i < actions.length; ++i) {
@@ -436,6 +440,10 @@ export default class Synchronizer extends EventEmitter {
         clientId);
       return;
     }
+    if (!Array.isArray(actions.actions)) {
+      this.connector.error('Actions field is not array', clientId);
+      return;
+    }
     if (client.connected) client.ackId = actions.id;
     debug('Client input queue:', actions.actions);
     // Copy the contents to input queue. concat is pretty slow.
@@ -456,7 +464,7 @@ export default class Synchronizer extends EventEmitter {
     // Update last time.
     client.lastTime = Date.now();
     this.doUnfreeze(client);
-    if (this.inputQueue.length !== 0 && this.config.dynamic) {
+    if (actions.actions.length !== 0 && this.config.dynamic) {
       // Start the dynamic tick timer,
       if (this.dynamicTickTimer === null && this.started) {
         debug('Starting tick timer');
