@@ -226,6 +226,7 @@ export default class Synchronizer extends EventEmitter {
   // Handles the tick - run state machine, empty queue, etc...
   handleTick() {
     if (this.host) {
+      if (this.config.dynamic && this.inputQueue.length === 0) return;
       let currentTime = Date.now();
       // Host should check whether to hang, send input buffer to clients,
       // then process itself.
@@ -233,7 +234,9 @@ export default class Synchronizer extends EventEmitter {
         let client = this.clientList[i];
         // Client is matched up with the server; continue anyway.
         if (client.ackId === this.tickId) continue;
-        if (client.lastTime + this.config.disconnectWait < currentTime) {
+        if (client.freezeTime &&
+          client.freezeTime + this.config.disconnectWait < currentTime
+        ) {
           debug('Client %d over disconnect threshold, disconnecting',
             client.id);
           // Forcefully disconnect the client
@@ -321,6 +324,7 @@ export default class Synchronizer extends EventEmitter {
       this.emit('freeze');
     } else if (!client.frozen) {
       client.frozen = true;
+      client.freezeTime = Date.now();
       this.frozen += 1;
       debug('Freezing due to client %d, counter %d', client.id, this.frozen);
       if (this.frozen === 1) this.emit('freeze', client.id);
@@ -332,6 +336,7 @@ export default class Synchronizer extends EventEmitter {
       this.emit('unfreeze');
     } else if (client.frozen) {
       client.frozen = false;
+      client.freezeTime = null;
       this.frozen -= 1;
       debug('Unfreezing client %d, counter %d', client.id, this.frozen);
       if (this.frozen === 0) this.emit('unfreeze', client.id);
@@ -400,6 +405,7 @@ export default class Synchronizer extends EventEmitter {
       if (client == null) {
         this.connector.error('Client ID ' + clientId + ' does not exist',
           clientId);
+        return;
       }
       debug('Client %d has disconnected', clientId);
       // Remove the client, that's all.
@@ -464,7 +470,7 @@ export default class Synchronizer extends EventEmitter {
     // Update last time.
     client.lastTime = Date.now();
     this.doUnfreeze(client);
-    if (actions.actions.length !== 0 && this.config.dynamic) {
+    if (this.inputQueue.length !== 0 && this.config.dynamic) {
       // Start the dynamic tick timer,
       if (this.dynamicTickTimer === null && this.started) {
         debug('Starting tick timer');
