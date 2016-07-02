@@ -85,7 +85,7 @@ export default class HostSynchronizer extends Synchronizer {
     }
   }
   doAck(tickId) {
-    this.connector.ack({
+    this.handleAck({
       id: tickId,
       actions: this.outputQueue
     }, this.connector.getClientId());
