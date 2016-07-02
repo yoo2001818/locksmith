@@ -57,6 +57,9 @@ Host synchronizer can opt to validate / transform actions by setting
 `null`), the action will be ignored. Returned object from the function will
 be used as action instead.
 
+In order to make `push` function Promise, `clientId` value must be present.
+Also, since it must store Promise ID, `promiseId` value must be not occupied.
+
 ## Combining
 Lastly, combine everything together to create a synchronizer.
 

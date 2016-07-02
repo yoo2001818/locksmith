@@ -20,10 +20,21 @@ let synchronizer = new HostSynchronizer(machine, connector, {
 connector.synchronizer = synchronizer;
 synchronizer.actionHandler = (action, client) => {
   console.log(action, client);
+  if (typeof action === 'object') {
+    return Object.assign({}, action, {
+      clientId: client.id
+    });
+  }
   return action;
 };
 synchronizer.start();
 
 synchronizer.push(3);
 synchronizer.push(3);
-synchronizer.push('*');
+synchronizer.push({
+  data: '*'
+}, true)
+.then(state => {
+  console.log('Success!');
+  console.log(state);
+});

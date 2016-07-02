@@ -14,7 +14,12 @@ export default class ReducerMachine {
     this.state = state;
   }
   run(action) {
-    this.state = this.reducer(this.state, action);
+    if (action && action.data) {
+      this.state = this.reducer(this.state, action.data);
+    } else {
+      this.state = this.reducer(this.state, action);
+    }
     console.log('State: ', this.state);
+    return this.state;
   }
 }

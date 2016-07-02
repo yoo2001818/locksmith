@@ -75,6 +75,9 @@ export default class Synchronizer extends EventEmitter {
     // Timer objects
     this.dynamicPushTimer = null;
     this.fixedTickTimer = null;
+    // Promise callbacks used in push function.
+    this.promiseId = 0;
+    this.promises = {};
   }
   // Only server should call this; clients will automatically call this
   // when connected.
@@ -107,9 +110,8 @@ export default class Synchronizer extends EventEmitter {
     }
   }
   // Queues and triggers the action created from UI / etc, ...
-  push(action) {
+  push(action, usePromise) {
     debug('Push:', action);
-    this.outputQueue.push(action);
     if (this.config.dynamic && this.dynamicPushTimer === null && this.started) {
       debug('Dynamic mode: starting push timer');
       this.dynamicPushTimer = setTimeout(() => {
@@ -117,6 +119,18 @@ export default class Synchronizer extends EventEmitter {
         this.dynamicPushTimer = null;
         this.doPush();
       }, this.config.dynamicPushWait);
+    }
+    if (usePromise) {
+      let promiseId = this.promiseId ++;
+      let promise = new Promise((resolve, reject) => {
+        this.promises[promiseId] = { resolve, reject };
+      });
+      this.outputQueue.push(Object.assign({}, action, {
+        promiseId
+      }));
+      return promise;
+    } else {
+      this.outputQueue.push(action);
     }
   }
   // Actually pushes the data to the server. This is only required for
@@ -181,7 +195,28 @@ export default class Synchronizer extends EventEmitter {
       this.tickId = frame.id;
       debug('Processing tick', frame.id, frame.actions);
       for (let i = 0; i < frame.actions.length; ++i) {
-        this.machine.run(frame.actions[i]);
+        let action = frame.actions[i];
+        // TODO pull out from this function to enable V8 optimization
+        let result, error;
+        try {
+          result = this.machine.run(action);
+        } catch (e) {
+          result = e;
+          error = true;
+        }
+        if (action.clientId === this.connector.getClientId() &&
+          this.promises[action.promiseId] != null
+        ) {
+          let promises = this.promises[action.promiseId];
+          if (error) {
+            promises.reject(result);
+          } else {
+            promises.resolve(result);
+          }
+          delete this.promises[action.promiseId];
+        } else if (error) {
+          this.handleError(result);
+        }
       }
       this.emit('tick', this.tickId);
     }

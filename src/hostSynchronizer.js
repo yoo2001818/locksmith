@@ -280,11 +280,18 @@ export default class HostSynchronizer extends Synchronizer {
   }
   handleError(error, clientId) {
     this.emit('error', error, clientId);
-    this.connector.error(error, clientId);
+    if (clientId != null && clientId !== this.connector.getClientId()) {
+      this.connector.error(error, clientId);
+    }
   }
   validateAction(action, client) {
     if (this.actionHandler) {
       return this.actionHandler(action, client);
+    }
+    if (typeof action === 'object') {
+      return Object.assign({}, action, {
+        clientId: client.id
+      });
     }
     return action;
   }
