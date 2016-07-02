@@ -66,6 +66,8 @@ export default class Synchronizer extends EventEmitter {
     // The output queue. This stores the actions triggered by UI / etc...,
     // and sends it to the server.
     this.outputQueue = [];
+    // The round trip time between the host and the client.
+    this.rtt = 0;
     // Is the system frozen? How many clients are affecting the status?
     this.frozen = 0;
     // Is the system started?
@@ -140,6 +142,7 @@ export default class Synchronizer extends EventEmitter {
     debug('Received push from the server');
     this.inputQueue.push(actions);
     this.doAck(actions.id);
+    this.rtt = actions.rtt;
     // Cancel push timer if exists.
     if (this.config.dynamic && this.dynamicPushTimer != null) {
       debug('Cancelling push timer');
@@ -198,8 +201,8 @@ export default class Synchronizer extends EventEmitter {
   handleConnect(data) {
     // Server has sent the startup state information.
     if (this.started) {
-      this.connector.error('Client startup already done; but server sent' +
-        'connection info', this.connector.getHostId());
+      this.emit('error', 'Client startup already done; but server sent' +
+        'connection info');
       return;
     }
     debug('Connect event received', data.tickId);
@@ -223,6 +226,9 @@ export default class Synchronizer extends EventEmitter {
     debug('Disconnected from the server, stopping');
     this.stop();
     this.emit('disconnect');
+  }
+  handleError(error) {
+    this.emit('error', error);
   }
 
 }

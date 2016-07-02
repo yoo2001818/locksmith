@@ -29,8 +29,9 @@ The connector should implement following functions:
   hasn't made, it should connect to the target.
 - disconnect(targetId) - Executes `synchronizer.handleDisconnect(senderId)`
   on target. The connection should be closed, of course.
-- error(data, targetId) - Handles the error. It may send the error to target,
-  or just print it on the console.
+- error(data, targetId) - Handles the error. It may send the error to target
+  (Execute `synchronizer.handleError(error)`), or just print it on the console.
+  Error is a plain string object.
 
 ## Machine
 Then, you need to create a machine object to process the action and the state.
@@ -122,6 +123,8 @@ Same for disconnect, etc.
   host.
 - disconnect(clientId) - A client has disconnected. `clientId` is only available
   on host.
+- error(error, clientId) - An error has occurred. `clientId` is only available
+  on host. **You must listen to this event to prevent terminating node process!**
 
 # Configuration
 Synchronizer has number of options that changes the behavior of synchronization.

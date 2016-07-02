@@ -59,12 +59,12 @@ export default class HostSynchronizer extends Synchronizer {
     if (!this.config.dynamic) return;
     let client = this.clients[clientId];
     if (client == null) {
-      this.connector.error('Client ID ' + clientId + ' does not exist',
+      this.handleError('Client ID ' + clientId + ' does not exist',
         clientId);
       return;
     }
     if (!Array.isArray(actions)) {
-      this.connector.error('Actions value is not array', clientId);
+      this.handleError('Actions value is not array', clientId);
       return;
     }
     debug('Received push from ', clientId);
@@ -133,13 +133,16 @@ export default class HostSynchronizer extends Synchronizer {
     // Now, push the input buffer to the clients.
     let sendData = {
       id: this.tickId,
-      actions: this.hostQueue
+      actions: this.hostQueue,
+      rtt: 0
     };
     this.hostQueue = [];
     debug('Pushing host queue', this.inputQueue);
     for (let i = 0; i < this.clientList.length; ++i) {
       if (this.clientList[i].id === this.connector.getHostId()) continue;
-      this.connector.push(sendData, this.clientList[i].id);
+      this.connector.push(Object.assign({}, sendData, {
+        rtt: this.clientList[i].rtt
+      }), this.clientList[i].id);
     }
     super.handlePush(sendData, true);
     if (!this.config.dynamic) super.handleTick();
@@ -166,7 +169,7 @@ export default class HostSynchronizer extends Synchronizer {
   }
   handleConnect(data, clientId) {
     if (this.clients[clientId] != null) {
-      this.connector.error('Client already joined', clientId);
+      this.handleError('Client already joined', clientId);
       return;
     }
     debug('Client %d has joined', clientId);
@@ -187,7 +190,10 @@ export default class HostSynchronizer extends Synchronizer {
     this.connector.connect({
       state: this.machine.getState(),
       tickId: this.tickId,
-      config: this.config
+      config: this.config,
+      // Send client ID along with the connect signal; this might be
+      // used by connector.
+      id: clientId
       // Nothing else is required for now
     }, clientId);
     this.emit('connect', clientId);
@@ -195,7 +201,7 @@ export default class HostSynchronizer extends Synchronizer {
   handleDisconnect(clientId) {
     let client = this.clients[clientId];
     if (client == null) {
-      this.connector.error('Client ID ' + clientId + ' does not exist',
+      this.handleError('Client ID ' + clientId + ' does not exist',
         clientId);
       return;
     }
@@ -213,7 +219,7 @@ export default class HostSynchronizer extends Synchronizer {
     // ACK data has id and actions...
     let client = this.clients[clientId];
     if (client == null) {
-      this.connector.error('Client ID ' + clientId + ' does not exist',
+      this.handleError('Client ID ' + clientId + ' does not exist',
         clientId);
       return;
     }
@@ -222,18 +228,18 @@ export default class HostSynchronizer extends Synchronizer {
     // TCP will handle order issue, so we don't have to care about it
     if (actions == null ||
       (client.connected && actions.id !== client.ackId + 1)) {
-      this.connector.error('Wrong tick data received; order matching failed',
+      this.handleError('Wrong tick data received; order matching failed',
         clientId);
       return;
     }
     if (actions.id > this.tickId) {
       // Well, literally.
-      this.connector.error('Wrong tick data received; client is from future',
+      this.handleError('Wrong tick data received; client is from future',
         clientId);
       return;
     }
     if (!Array.isArray(actions.actions)) {
-      this.connector.error('Actions field is not array', clientId);
+      this.handleError('Actions field is not array', clientId);
       return;
     }
     if (client.connected) client.ackId = actions.id;
@@ -267,5 +273,9 @@ export default class HostSynchronizer extends Synchronizer {
         }, this.config.dynamicTickWait);
       }
     }
+  }
+  handleError(error, clientId) {
+    this.emit('error', error, clientId);
+    this.connector.error(error, clientId);
   }
 }
