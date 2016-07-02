@@ -68,12 +68,12 @@ options on connection.
 
 ### Server
 ```js
-import Synchronizer from 'locksmith';
+import { HostSynchronizer } from 'locksmith';
 
 let machine = new Machine();
 let connector = new Connector();
 
-let synchronizer = new Synchronizer(machine, connector, {
+let synchronizer = new HostSynchronizer(machine, connector, {
   dynamic: false,
   dynamicPushWait: 10,
   dynamicTickWait: 10,
@@ -82,7 +82,6 @@ let synchronizer = new Synchronizer(machine, connector, {
   disconnectWait: 10000,
   freezeWait: 1000
 });
-synchronizer.host = true;
 connector.synchronizer = synchronizer;
 
 synchronizer.start();
@@ -90,7 +89,7 @@ synchronizer.start();
 
 ### Client
 ```js
-import Synchronizer from 'locksmith';
+import { Synchronizer } from 'locksmith';
 
 let machine = new Machine();
 let connector = new Connector();
