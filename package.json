@@ -1,6 +1,6 @@
 {
   "name": "locksmith",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Lockstep deterministic state machine synchronization library",
   "main": "lib/index.js",
   "scripts": {
