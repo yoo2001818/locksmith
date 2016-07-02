@@ -1,4 +1,4 @@
-import Synchronizer from '../src/synchronizer';
+import HostSynchronizer from '../src/hostSynchronizer';
 
 import LocalConnectorServer from './localConnectorServer';
 
@@ -8,16 +8,15 @@ import calculatorReducer from './calculatorReducer';
 let machine = new ReducerMachine(calculatorReducer);
 let connector = new LocalConnectorServer();
 
-let synchronizer = new Synchronizer(machine, connector, {
+let synchronizer = new HostSynchronizer(machine, connector, {
   dynamic: true,
   dynamicPushWait: 100,
   dynamicTickWait: 100,
   fixedTick: 1000,
-  fixedBuffer: 1,
+  fixedBuffer: 0,
   disconnectWait: 10000,
   freezeWait: 2000
 });
-synchronizer.host = true;
 connector.synchronizer = synchronizer;
 synchronizer.start();
 
