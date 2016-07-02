@@ -70,7 +70,9 @@ export default class HostSynchronizer extends Synchronizer {
     debug('Received push from ', clientId);
     // Copy the contents to input queue. concat is pretty slow.
     for (let i = 0; i < actions.length; ++i) {
-      this.hostQueue.push(actions[i]);
+      let transformed = this.validateAction(actions[i], client);
+      if (transformed === null) continue;
+      this.hostQueue.push(transformed);
     }
     // Start the dynamic tick timer,
     if (!this.frozen && this.dynamicTickTimer === null && this.started) {
@@ -246,7 +248,9 @@ export default class HostSynchronizer extends Synchronizer {
     debug('Client input queue:', actions.actions);
     // Copy the contents to input queue. concat is pretty slow.
     for (let i = 0; i < actions.actions.length; ++i) {
-      this.hostQueue.push(actions.actions[i]);
+      let transformed = this.validateAction(actions.actions[i], client);
+      if (transformed === undefined) continue;
+      this.hostQueue.push(transformed);
     }
     // Update RTT...
     if (client.connected) {
@@ -277,5 +281,11 @@ export default class HostSynchronizer extends Synchronizer {
   handleError(error, clientId) {
     this.emit('error', error, clientId);
     this.connector.error(error, clientId);
+  }
+  validateAction(action, client) {
+    if (this.actionHandler) {
+      return this.actionHandler(action, client);
+    }
+    return action;
   }
 }

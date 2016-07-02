@@ -18,6 +18,10 @@ let synchronizer = new HostSynchronizer(machine, connector, {
   freezeWait: 2000
 });
 connector.synchronizer = synchronizer;
+synchronizer.actionHandler = (action, client) => {
+  console.log(action, client);
+  return action;
+};
 synchronizer.start();
 
 synchronizer.push(3);

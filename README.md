@@ -51,6 +51,12 @@ still action order conflicts can occur. Machine should be able to process
 the action normally even if action conflict occurs. Synchronizer should
 provide a way to sort the actions, but it's work in progress.
 
+## Action validation / transformation
+Host synchronizer can opt to validate / transform actions by setting
+`actionHandler(action, client): Object` property. If it returns `undefined` (not
+`null`), the action will be ignored. Returned object from the function will
+be used as action instead.
+
 ## Combining
 Lastly, combine everything together to create a synchronizer.
 
