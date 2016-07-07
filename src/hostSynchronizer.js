@@ -33,15 +33,25 @@ export default class HostSynchronizer extends Synchronizer {
     // Or we can call remove
     this.clients[clientId] = undefined;
   }
-  start() {
+  start(data) {
+    if (this.started) return;
     debug('Adding itself into the clients list');
-    this.addClient({
+
+    // Create client information of server itself
+    let client = {
       id: this.connector.getClientId(),
       rtt: 0,
       ackId: 0,
       lastTime: Date.now(),
       connected: true
-    });
+    };
+    let meta = data;
+    if (this.validateConnect != null) {
+      meta = this.validateConnect(data, 0);
+    }
+    client.meta = meta;
+    this.addClient(client);
+
     super.start();
     // If there are any backlogs in host buffer, process them
     if (this.config.dynamic && this.hostQueue.length > 0) {
