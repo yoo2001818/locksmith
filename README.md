@@ -60,6 +60,14 @@ be used as action instead.
 In order to make `push` function Promise, `clientId` value must be present.
 Also, since it must store Promise ID, `promiseId` value must be not occupied.
 
+## Connection validation
+Host synchronizer can also opt to connection validation by setting
+`connectionHandler(meta, client): Object` property. It should return modified
+(or original) metadata object, or it should throw an error. If an error is
+thrown, the connection will be rejected. Client metadata is available via
+`client.meta` after the validation (which means it's not available in
+validation)
+
 ## Combining
 Lastly, combine everything together to create a synchronizer.
 

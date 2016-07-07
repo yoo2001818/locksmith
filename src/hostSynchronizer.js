@@ -17,6 +17,9 @@ export default class HostSynchronizer extends Synchronizer {
     this.clientList = [];
 
     this.dynamicTickTimer = null;
+
+    this.validateAction = null;
+    this.validateConnect = null;
   }
   addClient(client) {
     debug('Client added: ', client.id);
@@ -183,6 +186,17 @@ export default class HostSynchronizer extends Synchronizer {
       lastTime: Date.now(),
       connected: false
     };
+    let meta = data;
+    if (this.validateConnect != null) {
+      try {
+        meta = this.validateConnect(data, clientId);
+      } catch (e) {
+        // Reject connection
+        this.handleError((e && e.message) || e, clientId);
+        return;
+      }
+    }
+    client.meta = meta;
     this.addClient(client);
     // Freeze until client sends ACK.
     debug('Freezing until ACK received');
