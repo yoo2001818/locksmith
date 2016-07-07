@@ -18,8 +18,8 @@ export default class HostSynchronizer extends Synchronizer {
 
     this.dynamicTickTimer = null;
 
-    this.validateAction = null;
-    this.validateConnect = null;
+    this.actionHandler = null;
+    this.connectionHandler = null;
   }
   addClient(client) {
     debug('Client added: ', client.id);
@@ -46,8 +46,8 @@ export default class HostSynchronizer extends Synchronizer {
       connected: true
     };
     let meta = data;
-    if (this.validateConnect != null) {
-      meta = this.validateConnect(data, 0);
+    if (this.connectionHandler != null) {
+      meta = this.connectionHandler(data, 0);
     }
     client.meta = meta;
     this.addClient(client);
@@ -197,9 +197,9 @@ export default class HostSynchronizer extends Synchronizer {
       connected: false
     };
     let meta = data;
-    if (this.validateConnect != null) {
+    if (this.connectionHandler != null) {
       try {
-        meta = this.validateConnect(data, clientId);
+        meta = this.connectionHandler(data, clientId);
       } catch (e) {
         // Reject connection
         this.handleError((e && e.message) || e, clientId);
