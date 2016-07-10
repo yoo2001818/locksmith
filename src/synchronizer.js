@@ -78,6 +78,8 @@ export default class Synchronizer extends EventEmitter {
     // Promise callbacks used in push function.
     this.promiseId = 0;
     this.promises = {};
+    // Metadata of client itself.
+    this.meta = null;
   }
   // Only server should call this; clients will automatically call this
   // when connected.
@@ -244,6 +246,7 @@ export default class Synchronizer extends EventEmitter {
     debug(data.config);
     this.tickId = data.tickId;
     this.config = data.config;
+    this.meta = data.meta;
     this.machine.loadState(data.state);
     this.start();
     debug('Sending connect ACK');

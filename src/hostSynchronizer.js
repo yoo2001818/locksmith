@@ -49,6 +49,7 @@ export default class HostSynchronizer extends Synchronizer {
     if (this.connectionHandler != null) {
       meta = this.connectionHandler(data, 0);
     }
+    this.meta = meta;
     client.meta = meta;
     this.addClient(client);
 
@@ -219,7 +220,8 @@ export default class HostSynchronizer extends Synchronizer {
       config: this.config,
       // Send client ID along with the connect signal; this might be
       // used by connector.
-      id: clientId
+      id: clientId,
+      meta
       // Nothing else is required for now
     }, clientId);
     this.emit('connect', clientId);
